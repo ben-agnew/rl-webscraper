@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  selenium-hub:
+    image: selenium/hub
+    environment:
+      - SE_SESSION_REQUEST_TIMEOUT=30
+      - SE_NODE_SESSION_TIMEOUT=10
+  selenium-node:
+    image: selenium/node-chrome
+    shm_size: 1gb
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SE_NODE_SESSION_TIMEOUT=10
+      - SE_NODE_MAX_SESSIONS=4
+    deploy:
+      mode: replicated
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+  cache:
+    image: redis
+  webscraper:
+    build:
+      context: ./
+      dockerfile: ./services/webscraper/Dockerfile
+    depends_on:
+      - selenium-hub
+    ports:
+      - "8090:8080"
+  trackernet:
+    build:
+      context: ./
+      dockerfile: ./services/trackernet/Dockerfile
+    depends_on:
+      - webscraper
+      - cache
+  api:
+    build:
+      context: ./
+      dockerfile: ./services/api/Dockerfile
+    depends_on:
+      - trackernet
+      - cache
+    ports:
+      - "8080:8080"
